@@ -1,19 +1,30 @@
-FROM python:3.9
+FROM python:3.14.2-alpine3.23 AS build
 
-EXPOSE 8080
-USER root
+WORKDIR /payment
+
+RUN apk add --no-cache build-base linux-headers
+
+COPY requirements.txt .
+
+RUN pip install  --no-cache-dir -r requirements.txt
+
+COPY *.py .
+
+COPY payment.ini .
 
 ENV INSTANA_SERVICE_NAME=payment
 
-WORKDIR /app
 
-COPY requirements.txt /app/
+FROM python:3.14.2-alpine3.23 AS runtime
 
-RUN pip install -r requirements.txt
+WORKDIR /payment
 
-COPY *.py /app/
-COPY payment.ini /app/
 
-#CMD ["python", "payment.py"]
+COPY --from=build /usr/local /usr/local
+COPY --from=build /payment /payment
+
+
+EXPOSE 8080
+
 CMD ["uwsgi", "--ini", "payment.ini"]
 

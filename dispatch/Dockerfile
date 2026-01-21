@@ -1,4 +1,4 @@
-FROM golang:1.23
+FROM golang:1.26-rc-alpine
 
 WORKDIR /go/src/app
 
@@ -8,3 +8,4 @@ RUN go mod init dispatch && go get
 RUN go install
 
 CMD dispatch
+

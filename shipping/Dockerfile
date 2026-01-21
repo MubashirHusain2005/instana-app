@@ -1,36 +1,25 @@
-#
-# Build
-#
-FROM debian:10 AS build
+FROM maven:3.9.12-eclipse-temurin-11-alpine AS build
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ca-certificates-java \
-        maven && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    update-ca-certificates -f
+WORKDIR /app
 
-WORKDIR /opt/shipping
+COPY pom.xml .
 
-COPY pom.xml /opt/shipping/
-RUN mvn dependency:resolve
-COPY src /opt/shipping/src/
+RUN mvn dependency:go-offline
+
+COPY src ./src
+
 RUN mvn package
 
-#
-# Run
-#
-FROM openjdk:8-jdk
+FROM eclipse-temurin:11-jre-alpine AS runtime
 
 EXPOSE 8080
 
-WORKDIR /opt/shipping
+WORKDIR /app
 
 ENV CART_ENDPOINT=cart:8080
 ENV DB_HOST=mysql
 
-COPY --from=build /opt/shipping/target/shipping-1.0.jar shipping.jar
+COPY --from=build /app/target/shipping-1.0.jar shipping.jar
 
-CMD [ "java", "-Xmn256m", "-Xmx768m", "-jar", "shipping.jar" ]
+CMD ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "shipping.jar"]
 

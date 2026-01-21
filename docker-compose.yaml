@@ -1,172 +1,194 @@
-version: '3'
+version: "3"
+
 services:
   mongodb:
     build:
       context: mongo
-    image: ${REPO}/rs-mongodb:${TAG}
+    image: mongo:1.0
     networks:
       - robot-shop
-    logging: &logging
-      driver: "json-file"
-      options:
-        max-size: "25m"
-        max-file: "2"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 })' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   redis:
     image: redis:6.2-alpine
     networks:
       - robot-shop
-    logging:
-      <<: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3.8-management-alpine
     networks:
       - robot-shop
-    logging:
-      <<: *logging
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mysql:
+    build:
+      context: ./mysql
+    image: robotshop-mysql:custom
+    container_name: robotshop-mysql
+    environment:
+      MYSQL_DATABASE: cities
+      MYSQL_USER: shipping
+      MYSQL_PASSWORD: secret
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - robot-shop
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+
+
+
   catalogue:
     build:
       context: catalogue
-    image: ${REPO}/rs-catalogue:${TAG}
+    image: catalogue:1.0
     depends_on:
       - mongodb
     networks:
       - robot-shop
     healthcheck:
-      test: [ "CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/health" ]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    logging:
-      <<: *logging
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   user:
     build:
       context: user
-    image: ${REPO}/rs-user:${TAG}
+    image: user:1.0
     depends_on:
       - mongodb
       - redis
     networks:
       - robot-shop
     healthcheck:
-      test: [ "CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/health" ]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    logging:
-      <<: *logging
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   cart:
     build:
       context: cart
-    image: ${REPO}/rs-cart:${TAG}
+    image: cart:1.0
     depends_on:
       - redis
     networks:
       - robot-shop
     healthcheck:
-      test: [ "CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/health" ]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    logging:
-      <<: *logging
-  mysql:
-    build:
-      context: mysql
-    image: ${REPO}/rs-mysql-db:${TAG}
-    cap_add:
-      - NET_ADMIN
-    networks:
-      - robot-shop
-    logging:
-      <<: *logging
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   shipping:
-    build:
-      context: shipping
-    image: ${REPO}/rs-shipping:${TAG}
+    build: shipping
+    image: shipping:2.0
     depends_on:
-      - mysql
-    networks:
-      - robot-shop
-    healthcheck:
-      test: ["CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    logging:
-      <<: *logging
-  ratings:
-    build:
-      context: ratings
-    image: ${REPO}/rs-ratings:${TAG}
+      mysql:
+        condition: service_healthy
     environment:
-      APP_ENV: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: cities
+      MYSQL_USER: shipping
+      MYSQL_PASSWORD: secret
     networks:
       - robot-shop
+
+
+
+  ratings:
+    build: ratings
+    image: ratings:1.0
     depends_on:
-      - mysql
-    healthcheck:
-      test: ["CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost/_health"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    logging:
-      <<: *logging
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: cities
+      MYSQL_USER: shipping
+      MYSQL_PASSWORD: secret
+    networks:
+      - robot-shop
+
+
+
   payment:
     build:
       context: payment
-    image: ${REPO}/rs-payment:${TAG}
+    image: payment:2.0
+    user: root
     depends_on:
       - rabbitmq
     networks:
       - robot-shop
     healthcheck:
-      test: ["CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    # Uncomment to change payment gateway
-    #environment:
-      #PAYMENT_GATEWAY: "https://www.worldpay.com"
-    logging:
-      <<: *logging
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   dispatch:
     build:
       context: dispatch
-    image: ${REPO}/rs-dispatch:${TAG}
+    image: dispatch:1.0
     depends_on:
       - rabbitmq
     networks:
       - robot-shop
-    logging:
-      <<: *logging
+
   web:
     build:
       context: web
-      args:
-        # agent key to download tracing libs
-        KEY: ${INSTANA_AGENT_KEY}
-    image: ${REPO}/rs-web:${TAG}
+    image: web:1.0
     depends_on:
       - catalogue
       - user
+      - cart
       - shipping
       - payment
+      - ratings
     ports:
       - "8080:8080"
     networks:
       - robot-shop
     healthcheck:
-      test: [ "CMD", "curl", "-H", "X-INSTANA-SYNTHETIC: 1", "-f", "http://localhost:8080/" ]
-      interval: 10s
-      timeout: 10s
-      retries: 3
-    # Uncomment to enable Instana EUM
-    # environment:
-      # INSTANA_EUM_KEY: <your eum key>
-      # INSTANA_EUM_REPORTING_URL: <your reporting url>
-    logging:
-      <<: *logging
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+     
 
 networks:
   robot-shop:
+
+volumes:
+  mysql-data:
 

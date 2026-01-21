@@ -1,16 +1,22 @@
-FROM node:14
+FROM node:25-alpine3.22 AS build
 
-ENV INSTANA_AUTO_PROFILE true
+WORKDIR /catalogue
 
-EXPOSE 8080
-
-WORKDIR /opt/server
-
-COPY package.json /opt/server/
+COPY package.json .
 
 RUN npm install
 
-COPY server.js /opt/server/
+COPY server.js .
+
+ENV INSTANA_AUTO_PROFILE true
+
+FROM node:25-alpine3.22 AS runtime
+
+WORKDIR /catalogue
+
+COPY  --from=build /catalogue /catalogue
+
+EXPOSE 8080
 
 CMD ["node", "server.js"]
 

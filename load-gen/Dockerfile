@@ -1,21 +1,30 @@
-FROM python:3.9
+FROM python:3.14.2-alpine3.23 AS build
 
-# Some default values
+WORKDIR /loadgen
+
+COPY requirements.txt .
+RUN pip install  --no-cache-dir -r requirements.txt
+
+COPY entrypoint.sh .
+
+COPY robot-shop.py .
+
+FROM python:3.14.2-alpine3.23 AS runtime
+
+WORKDIR /loadgen
+
 ENV HOST="http://localhost:8080/" \
     SILENT=0 \
     NUM_CLIENTS=1 \
     ERROR=0 \
     RUN_TIME=0
-    
 
-WORKDIR /load
+RUN adduser -D appuser
 
-COPY requirements.txt /load/
+COPY --from=build /usr/local /usr/local
+COPY --from=build /loadgen /loadgen
 
-RUN pip install -r requirements.txt
-
-COPY entrypoint.sh /load/
-COPY robot-shop.py /load/
+USER appuser
 
 CMD ["./entrypoint.sh"]
 

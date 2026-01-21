@@ -1,16 +1,26 @@
-FROM node:14
+FROM node:25-alpine3.22 AS build
+
+WORKDIR /app
+
+COPY package.json .
+RUN npm install
+
+COPY server.js .
 
 ENV INSTANA_AUTO_PROFILE true
 
+FROM node:25-alpine3.22 AS runtime
+
+RUN adduser -D appuser
+
+WORKDIR /app
+
+COPY --from=build /app /app
+
+USER appuser
+
 EXPOSE 8080
 
-WORKDIR /opt/server
+CMD ["node","server.js"]
 
-COPY package.json /opt/server/
-
-RUN npm install
-
-COPY server.js /opt/server/
-
-CMD ["node", "server.js"]
 

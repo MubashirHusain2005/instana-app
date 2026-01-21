@@ -1,18 +1,16 @@
 FROM mysql:5.7
 
-VOLUME /data
-
 ENV MYSQL_ALLOW_EMPTY_PASSWORD=yes \
     MYSQL_DATABASE=cities \
     MYSQL_USER=shipping \
     MYSQL_PASSWORD=secret
 
-# change datadir entry in /etc/mysql/my.cnf
-COPY config.sh /root/
-RUN /root/config.sh
+# Copy init scripts only (run at container startup, not build time)
+COPY scripts/ /docker-entrypoint-initdb.d/
 
-COPY scripts/* /docker-entrypoint-initdb.d/
+# Fix permissions + CRLF just in case
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh || true \
+    && sed -i 's/\r$//' /docker-entrypoint-initdb.d/*.sh || true
 
-#RUN /entrypoint.sh mysqld & while [ ! -f /tmp/finished ]; do sleep 10; done
-#RUN rm /docker-entrypoint-initdb.d/*
+EXPOSE 3306
 
