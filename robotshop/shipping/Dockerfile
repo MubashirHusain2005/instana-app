@@ -22,4 +22,3 @@ ENV DB_HOST=mysql
 COPY --from=build /app/target/shipping-1.0.jar shipping.jar
 
 CMD ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "shipping.jar"]
-

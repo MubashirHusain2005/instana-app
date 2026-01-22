@@ -27,4 +27,3 @@ COPY --from=build /loadgen /loadgen
 USER appuser
 
 CMD ["./entrypoint.sh"]
-

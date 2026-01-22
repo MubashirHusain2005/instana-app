@@ -19,4 +19,3 @@ COPY  --from=build /catalogue /catalogue
 EXPOSE 8080
 
 CMD ["node", "server.js"]
-

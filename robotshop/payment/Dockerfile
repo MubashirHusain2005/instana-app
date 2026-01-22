@@ -27,4 +27,3 @@ COPY --from=build /payment /payment
 EXPOSE 8080
 
 CMD ["uwsgi", "--ini", "payment.ini"]
-

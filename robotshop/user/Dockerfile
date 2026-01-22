@@ -1,26 +1,29 @@
-FROM node:25-alpine3.22 AS build
+#
+# Build
+#
+FROM debian:10 AS build
 
-WORKDIR /app
+RUN apt-get update && apt-get -y install maven
 
-COPY package.json .
-RUN npm install
+WORKDIR /opt/shipping
 
-COPY server.js .
+COPY pom.xml /opt/shipping/
+RUN mvn dependency:resolve
+COPY src /opt/shipping/src/
+RUN mvn package
 
-ENV INSTANA_AUTO_PROFILE true
-
-FROM node:25-alpine3.22 AS runtime
-
-RUN adduser -D appuser
-
-WORKDIR /app
-
-COPY --from=build /app /app
-
-USER appuser
+#
+# Run
+#
+FROM openjdk:8-jdk
 
 EXPOSE 8080
 
-CMD ["node","server.js"]
+WORKDIR /opt/shipping
 
+ENV CART_ENDPOINT=cart:8080
+ENV DB_HOST=mysql
 
+COPY --from=build /opt/shipping/target/shipping-1.0.jar shipping.jar
+
+CMD [ "java", "-Xmn256m", "-Xmx768m", "-jar", "shipping.jar" ]
